@@ -79,17 +79,17 @@ results, figures, intermediates = evaluate_intersectional_fairness(
 ```
 
 This:
--Fits the model on dev_df
--Evaluates fairness metrics on test_df
+- Fits the model on dev_df
+- Evaluates fairness metrics on test_df
 
 Supported Models
--Logistic Regression
--Random Forest
--LightGBM
+- Logistic Regression
+- Random Forest
+- LightGBM
 
 Any estimator implementing:
--fit(X, y)
--predict_proba(X)
+- fit(X, y)
+- predict_proba(X)
 
 ---
 
@@ -98,6 +98,6 @@ Interpretation
 Component 1 detects observed disparities only.
 
 It does not determine whether disparities arise due to:
--Structural covariate imbalance
--Systematic model dependence on group membership
--Random variation
+- Structural covariate imbalance
+- Systematic model dependence on group membership
+- Random variation
