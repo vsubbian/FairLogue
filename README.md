@@ -1,2 +1,10 @@
-# IF-Toolkit
-Toolkit to quantify intersectional biases in risk prediction or classification models
+# Fairlogue
+Fairlogue, a toolkit for intersectional fairness analysis in clinical machine learning models. This Python-based modular toolkit consists of 3 components that will allow you to quantify and contextualize intersectional biases. 
+The first component of the toolkit computes common fairness metrics (Equalized Odds, Demographic Parity, and Equal Opportunity Gap) along both single-axis demographics and intersectional demographics to provide a baseline
+understanding of the disparities present in the model. 
+
+The second component is a faithful translation of prior work that allows for quantifying intersectional biases under group membership based counterfactual scenarios for models with an explicit treatment variable.
+
+The third component is a generalized and extended version of component 2 that allows for quantifying intersectional biases under the same counterfactual scenarios but is applicable to a wider range of potential model types including models without a treatment variable.
+
+
