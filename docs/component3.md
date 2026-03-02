@@ -1,7 +1,3 @@
-
----
-
-```markdown
 # Fairlogue — Component 3  
 ## Counterfactual Group-Membership Fairness
 
@@ -132,3 +128,4 @@ Supports:
 - Random Forest
 - LightGBM
 - Custom scikit-learn estimators
+
