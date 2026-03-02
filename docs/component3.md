@@ -1,8 +1,6 @@
 
 ---
 
-# 📄 component3.md
-
 ```markdown
 # Fairlogue — Component 3  
 ## Counterfactual Group-Membership Fairness
@@ -90,24 +88,24 @@ m.fit_fairness(
 
 
 This:
--Fits the outcome model on dev_df_proc
--Computes counterfactual metrics on test_df_proc
+- Fits the outcome model on dev_df_proc
+- Computes counterfactual metrics on test_df_proc
 
 
 ---
 Outputs
 
 Component 3 provides:
--Counterfactual FNR / FPR
--Null distributions (optional)
--Bootstrap confidence intervals
--Disparity contrasts (Δ)
--U-values
+- Counterfactual FNR / FPR
+- Null distributions (optional)
+- Bootstrap confidence intervals
+- Disparity contrasts (Δ)
+- U-values
 
 U-Value Interpretation
 The U-value quantifies retained unfairness.
--U ≈ 0 → No systematic unfairness after conditioning
--U > δ → Meaningful model dependence on group membership
+- U ≈ 0 → No systematic unfairness after conditioning
+- U > δ → Meaningful model dependence on group membership
 δ is the acceptable fairness threshold (e.g., 0.1).
 
 
@@ -130,7 +128,7 @@ Recommended Workflow
 Model Compatibility
 
 Supports:
--Logistic Regression
--Random Forest
--LightGBM
--Custom scikit-learn estimators
+- Logistic Regression
+- Random Forest
+- LightGBM
+- Custom scikit-learn estimators
