@@ -138,6 +138,7 @@ def cross_validate_intersectional_fairness(df: pd.DataFrame,outcome: str,protect
     bootstrap_samples = []
     non_intersectional_metrics = []
     non_intersectional_groups = []
+    non_intersectional_bootstrap = []
 
     for fold_id, (train_idx, test_idx) in enumerate(skf.split(df, stratify_label), start=1):
         train_df = df.iloc[train_idx].drop(columns=["_intersectional_group_cv"])
@@ -204,10 +205,26 @@ def cross_validate_intersectional_fairness(df: pd.DataFrame,outcome: str,protect
                 "equalized_odds_gap_fpr": fairness_result.equalized_odds_gap_fpr,
                 "equal_opportunity_gap": fairness_result.equal_opportunity_gap
             })
+
             group_df = fairness_result.per_group_df.copy()
             group_df["fold"] = fold_id
             group_df["protected_attribute"] = attribute
             non_intersectional_groups.append(group_df)
+
+            if run_bootstrap:
+                boot = bootstrap_fairness_metrics(
+                    y_true=intermediates["y_test"],
+                    y_pred=intermediates["y_hat"],
+                    groups=test_df[attribute].astype(str).values,
+                    n_bootstrap=n_bootstrap,
+                    random_state=random_state + fold_id,
+                    min_group_size=min_group_size,
+                    require_class_balance=require_class_balance
+                )
+                boot_summary = boot["bootstrap_summary"].copy()
+                boot_summary["fold"] = fold_id
+                boot_summary["protected_attribute"] = attribute
+                non_intersectional_bootstrap.append(boot_summary)
 
     # Aggregate fold-level robustness summary
     summary_df = (fold_metrics_df.drop(columns=["fold", "n_test"]).agg(["mean", "std", "min", "max"]).T.reset_index().rename(columns={"index": "metric"}))
@@ -218,11 +235,24 @@ def cross_validate_intersectional_fairness(df: pd.DataFrame,outcome: str,protect
     summary_df["ci95_upper"] = summary_df["mean"] + 1.96 * summary_df["se"]
     non_intersectional_metrics_df = pd.DataFrame(non_intersectional_metrics)
     non_intersectional_groups_df = pd.concat(non_intersectional_groups, ignore_index=True) if non_intersectional_groups else pd.DataFrame()
+    non_intersectional_bootstrap_df = pd.concat(non_intersectional_bootstrap, ignore_index=True) if non_intersectional_bootstrap else pd.DataFrame()
+
+    non_intersectional_bootstrap_overall = (non_intersectional_bootstrap_df.groupby(["protected_attribute", "metric"]).agg(
+        mean_observed=("observed", "mean"),
+        mean_bootstrap=("bootstrap_mean", "mean"),
+        mean_se=("bootstrap_se", "mean"),
+        mean_ci95_lower=("ci95_lower", "mean"),
+        mean_ci95_upper=("ci95_upper", "mean"),
+        significant_folds=("significant_95ci", "sum"),
+        total_folds=("significant_95ci", "count"),
+        mean_p_value=("p_value_approx", "mean")
+    ).reset_index()) if not non_intersectional_bootstrap_df.empty else pd.DataFrame()
 
     return {"fold_metrics": fold_metrics_df,"summary": summary_df,"per_group_cv": per_group_cv_df,
             "bootstrap_by_fold": bootstrap_summary_df,"bootstrap_samples": bootstrap_samples_df,
             "bootstrap_overall": overall_bootstrap_summary, "non_intersectional_metrics": non_intersectional_metrics_df,
-            "non_intersectional_groups": non_intersectional_groups_df}
+            "non_intersectional_groups": non_intersectional_groups_df, "non_intersectional_bootstrap_by_fold": non_intersectional_bootstrap_df,
+            "non_intersectional_bootstrap_overall": non_intersectional_bootstrap_overall}
 
 
 
