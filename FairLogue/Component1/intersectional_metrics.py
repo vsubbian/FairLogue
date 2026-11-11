@@ -13,6 +13,85 @@ from .containers import FairnessResults, GroupRates
 from .plots import _plot_bar, _plot_bar_series_by_group, _plot_grouped_eods_components, _plot_fairness_matrix
 from .utilities import _compute_group_rates, _make_ohe, _get_model, _as_prob
 
+
+
+
+def bootstrap_group_metrics(y_true, y_pred, groups, y_prob=None,
+                            n_bootstrap: int = 1000, random_state: int = 42,
+                            min_group_size: int = 0,
+                            require_class_balance: bool = False,
+                            ci: float = 0.95) -> pd.DataFrame:
+    """
+    Per-group bootstrap CIs (percentile) for: positive_rate (demographic parity),
+    tpr, fpr, accuracy and, if y_prob is given, auroc.
+ 
+    Resamples test rows with replacement, so group sizes vary by replicate. Replicates
+    in which a group has no positives (for TPR/AUROC) or no negatives (for FPR/AUROC)
+    give NaN for that metric and are excluded; `n_valid_boot` reports how many remain.
+ 
+    Returns one row per (group, metric): n, observed, bootstrap_mean, bootstrap_se,
+    ci95_lower, ci95_upper, n_valid_boot.
+    """
+    y = np.asarray(y_true).astype(int)
+    h = np.asarray(y_pred).astype(int)
+    g = np.asarray(groups).astype(str)
+    p = None if y_prob is None else np.asarray(y_prob).astype(float)
+    metrics = ["positive_rate", "tpr", "fpr", "accuracy"] + (["auroc"] if p is not None else [])
+ 
+    def _one(yy, hh, pp):
+        pos, neg = yy == 1, yy == 0
+        out = {"positive_rate": hh.mean() if len(hh) else np.nan,
+               "tpr": hh[pos].mean() if pos.any() else np.nan,
+               "fpr": hh[neg].mean() if neg.any() else np.nan,
+               "accuracy": (hh == yy).mean() if len(hh) else np.nan}
+        if pp is not None:
+            out["auroc"] = roc_auc_score(yy, pp) if pos.any() and neg.any() else np.nan
+        return out
+ 
+    # Groups to report (same filters as the package's group-rate tables)
+    labels = []
+    for lab in sorted(np.unique(g)):
+        m = g == lab
+        if min_group_size > 0 and m.sum() < min_group_size:
+            continue
+        if require_class_balance and (y[m].sum() < 1 or (1 - y[m]).sum() < 1):
+            continue
+        labels.append(lab)
+ 
+    masks = {lab: g == lab for lab in labels}
+    observed = {lab: _one(y[m], h[m], None if p is None else p[m]) for lab, m in masks.items()}
+ 
+    rng = np.random.default_rng(random_state)
+    n = len(y)
+    draws = {lab: {k: [] for k in metrics} for lab in labels}
+    for _ in range(n_bootstrap):
+        idx = rng.integers(0, n, size=n)
+        yb, hb, gb = y[idx], h[idx], g[idx]
+        pb = None if p is None else p[idx]
+        for lab in labels:
+            m = gb == lab
+            r = _one(yb[m], hb[m], None if pb is None else pb[m])
+            for k in metrics:
+                draws[lab][k].append(r[k])
+ 
+    a = (1 - ci) / 2 * 100
+    rows = []
+    for lab in labels:
+        for k in metrics:
+            v = np.asarray(draws[lab][k], dtype=float)
+            v = v[~np.isnan(v)]
+            rows.append({"group": lab, "n": int(masks[lab].sum()), "metric": k,
+                         "observed": observed[lab][k],
+                         "bootstrap_mean": v.mean() if len(v) else np.nan,
+                         "bootstrap_se": v.std(ddof=1) if len(v) > 1 else np.nan,
+                         "ci95_lower": np.percentile(v, a) if len(v) else np.nan,
+                         "ci95_upper": np.percentile(v, 100 - a) if len(v) else np.nan,
+                         "n_valid_boot": len(v)})
+    return pd.DataFrame(rows)
+
+
+
+
 def bootstrap_fairness_metrics(y_true, y_pred, groups, n_bootstrap: int = 1000,random_state: int = 42,
                                min_group_size: int = 0,require_class_balance: bool = False,):
     """
@@ -197,14 +276,9 @@ def cross_validate_intersectional_fairness(df: pd.DataFrame,outcome: str,protect
 
     if return_non_intersectional:
         for attribute, fairness_result in intermediates["non_intersectional"].items():
-            non_intersectional_metrics.append({
-                "fold": fold_id,
-                "protected_attribute": attribute,
-                "demographic_parity_gap": fairness_result.demographic_parity_gap,
-                "equalized_odds_gap_tpr": fairness_result.equalized_odds_gap_tpr,
-                "equalized_odds_gap_fpr": fairness_result.equalized_odds_gap_fpr,
-                "equal_opportunity_gap": fairness_result.equal_opportunity_gap
-            })
+            non_intersectional_metrics.append({"fold": fold_id, "protected_attribute": attribute, "demographic_parity_gap": fairness_result.demographic_parity_gap,
+                                               "equalized_odds_gap_tpr": fairness_result.equalized_odds_gap_tpr, "equalized_odds_gap_fpr": fairness_result.equalized_odds_gap_fpr,
+                                               "equal_opportunity_gap": fairness_result.equal_opportunity_gap})
 
             group_df = fairness_result.per_group_df.copy()
             group_df["fold"] = fold_id
@@ -212,15 +286,9 @@ def cross_validate_intersectional_fairness(df: pd.DataFrame,outcome: str,protect
             non_intersectional_groups.append(group_df)
 
             if run_bootstrap:
-                boot = bootstrap_fairness_metrics(
-                    y_true=intermediates["y_test"],
-                    y_pred=intermediates["y_hat"],
-                    groups=test_df[attribute].astype(str).values,
-                    n_bootstrap=n_bootstrap,
-                    random_state=random_state + fold_id,
-                    min_group_size=min_group_size,
-                    require_class_balance=require_class_balance
-                )
+                boot = bootstrap_fairness_metrics(y_true=intermediates["y_test"], y_pred=intermediates["y_hat"], groups=test_df[attribute].astype(str).values,
+                                                  n_bootstrap=n_bootstrap, random_state=random_state + fold_id, min_group_size=min_group_size,
+                                                  require_class_balance=require_class_balance)
                 boot_summary = boot["bootstrap_summary"].copy()
                 boot_summary["fold"] = fold_id
                 boot_summary["protected_attribute"] = attribute
@@ -269,7 +337,7 @@ def evaluate_intersectional_fairness(df: pd.DataFrame,outcome: str,protected_1: 
                                      make_plots: bool = True,
                                      train_df: Optional[pd.DataFrame] = None, #If provided, use this as the training set instead of splitting from df
                                      test_df: Optional[pd.DataFrame] = None, #If provided, use this as the test set instead of splitting from df (must provide both train_df and test_df or neither)
-                                     *, return_intermediates = False, return_non_intersectional: bool = False,
+                                     *, return_intermediates = False, return_non_intersectional: bool = False, bootstrap_groups: bool = False, n_bootstrap: int = 1000,
                                      min_group_size: int = 0,           #drop groups with n < this
                                      require_class_balance: bool = False #require ≥1 pos & ≥1 neg per group
                                      ) -> Tuple[FairnessResults, Dict[str, plt.Figure]]:
@@ -542,9 +610,23 @@ def evaluate_intersectional_fairness(df: pd.DataFrame,outcome: str,protected_1: 
 
         
     if return_intermediates:
-       intermediates = {"y_test": y_test, "y_hat": y_hat,"groups_test": g_test,"proba": proba,
-                        "model_metrics": {"accuracy": accuracy,"auroc": auroc,"threshold": float(threshold),"test_size": float(test_size),"model_type": mt,},
-                        "non_intersectional": non_intersectional,}
-       return results, figs, intermediates
+                intermediates = {"y_test": y_test, "y_hat": y_hat, "groups_test": g_test,
+                                "proba": proba,
+                                "model_metrics": {"accuracy": accuracy, "auroc": auroc,
+                                                "threshold": float(threshold),
+                                                "test_size": float(test_size),
+                                                "model_type": mt},
+                                "non_intersectional": non_intersectional}
+                if bootstrap_groups:
+                    kw = dict(y_true=y_test, y_pred=y_hat, y_prob=proba,
+                            n_bootstrap=n_bootstrap, random_state=random_state,
+                            min_group_size=min_group_size,
+                            require_class_balance=require_class_balance)
+                    gb = {"intersectional": bootstrap_group_metrics(groups=g_test, **kw)}
+                    if return_non_intersectional:
+                        gb[protected_1] = bootstrap_group_metrics(groups=p1_test, **kw)
+                        gb[protected_2] = bootstrap_group_metrics(groups=p2_test, **kw)
+                    intermediates["group_bootstrap"] = gb
+                return results, figs, intermediates
 
     return results, figs
