@@ -8,6 +8,8 @@ __all__ = [
     "GroupRates",
     "FairnessResults",
     "evaluate_intersectional_fairness",
+    "cross_validate_intersectional_fairness",
+    "bootstrap_intersectional_fairness",
     "_plot_bar",
     "_plot_bar_series_by_group",
     "_plot_grouped_eods_components",
