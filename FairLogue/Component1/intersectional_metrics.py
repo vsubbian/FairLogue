@@ -109,8 +109,6 @@ def cross_validate_intersectional_fairness(df: pd.DataFrame,outcome: str,protect
     """
     Runs k-fold cross-validation for intersectional fairness metrics.
 
-    This wrapper keeps your existing evaluate_intersectional_fairness()
-    function unchanged and uses its train_df / test_df interface.
     """
 
     df = df.copy()
@@ -345,7 +343,7 @@ def evaluate_intersectional_fairness(df: pd.DataFrame,outcome: str,protected_1: 
     pre_dense = ColumnTransformer([
         ("num", num_pipe_dense, numeric_cols),
         ("cat", cat_pipe_dense, categorical_cols),
-    ], remainder="drop", sparse_threshold=1.1)
+    ], remainder="drop", sparse_threshold=1.0)
 
     #Get the model type and parameters
     clf = _get_model(model_type, model_params)
