@@ -250,10 +250,27 @@ def cross_validate_intersectional_fairness(df: pd.DataFrame,outcome: str,protect
             boot_samples = boot["bootstrap_samples"].copy()
             boot_samples["fold"] = fold_id
             bootstrap_samples.append(boot_samples)
+            
+        if return_non_intersectional:
+            for attribute, fairness_result in intermediates["non_intersectional"].items():
+                non_intersectional_metrics.append({"fold": fold_id, "protected_attribute": attribute, "demographic_parity_gap": fairness_result.demographic_parity_gap,
+                                                "equalized_odds_gap_tpr": fairness_result.equalized_odds_gap_tpr, "equalized_odds_gap_fpr": fairness_result.equalized_odds_gap_fpr,
+                                                "equal_opportunity_gap": fairness_result.equal_opportunity_gap})
 
-        fold_group_df = results.per_group_df.copy()
-        fold_group_df["fold"] = fold_id
-        per_group_results.append(fold_group_df)
+                group_df = fairness_result.per_group_df.copy()
+                group_df["fold"] = fold_id
+                group_df["protected_attribute"] = attribute
+                non_intersectional_groups.append(group_df)
+
+                if run_bootstrap:
+                    boot = bootstrap_fairness_metrics(y_true=intermediates["y_test"], y_pred=intermediates["y_hat"], groups=test_df[attribute].astype(str).values,
+                                                    n_bootstrap=n_bootstrap, random_state=random_state + fold_id, min_group_size=min_group_size,
+                                                    require_class_balance=require_class_balance)
+                    boot_summary = boot["bootstrap_summary"].copy()
+                    boot_summary["fold"] = fold_id
+                    boot_summary["protected_attribute"] = attribute
+                    non_intersectional_bootstrap.append(boot_summary)
+
 
     fold_metrics_df = pd.DataFrame(fold_summaries)
     per_group_cv_df = pd.concat(per_group_results, ignore_index=True)
@@ -274,25 +291,7 @@ def cross_validate_intersectional_fairness(df: pd.DataFrame,outcome: str,protect
         bootstrap_samples_df = pd.DataFrame()
         overall_bootstrap_summary = pd.DataFrame()
 
-    if return_non_intersectional:
-        for attribute, fairness_result in intermediates["non_intersectional"].items():
-            non_intersectional_metrics.append({"fold": fold_id, "protected_attribute": attribute, "demographic_parity_gap": fairness_result.demographic_parity_gap,
-                                               "equalized_odds_gap_tpr": fairness_result.equalized_odds_gap_tpr, "equalized_odds_gap_fpr": fairness_result.equalized_odds_gap_fpr,
-                                               "equal_opportunity_gap": fairness_result.equal_opportunity_gap})
 
-            group_df = fairness_result.per_group_df.copy()
-            group_df["fold"] = fold_id
-            group_df["protected_attribute"] = attribute
-            non_intersectional_groups.append(group_df)
-
-            if run_bootstrap:
-                boot = bootstrap_fairness_metrics(y_true=intermediates["y_test"], y_pred=intermediates["y_hat"], groups=test_df[attribute].astype(str).values,
-                                                  n_bootstrap=n_bootstrap, random_state=random_state + fold_id, min_group_size=min_group_size,
-                                                  require_class_balance=require_class_balance)
-                boot_summary = boot["bootstrap_summary"].copy()
-                boot_summary["fold"] = fold_id
-                boot_summary["protected_attribute"] = attribute
-                non_intersectional_bootstrap.append(boot_summary)
 
     # Aggregate fold-level robustness summary
     summary_df = (fold_metrics_df.drop(columns=["fold", "n_test"]).agg(["mean", "std", "min", "max"]).T.reset_index().rename(columns={"index": "metric"}))
