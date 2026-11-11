@@ -136,6 +136,8 @@ def cross_validate_intersectional_fairness(df: pd.DataFrame,outcome: str,protect
     per_group_results = []
     bootstrap_summaries = []
     bootstrap_samples = []
+    non_intersectional_metrics = []
+    non_intersectional_groups = []
 
     for fold_id, (train_idx, test_idx) in enumerate(skf.split(df, stratify_label), start=1):
         train_df = df.iloc[train_idx].drop(columns=["_intersectional_group_cv"])
@@ -149,6 +151,9 @@ def cross_validate_intersectional_fairness(df: pd.DataFrame,outcome: str,protect
                                                                         min_group_size=min_group_size,require_class_balance=require_class_balance,)
 
         model_metrics = intermediates["model_metrics"]
+        fold_group_df = results.per_group_df.copy()
+        fold_group_df["fold"] = fold_id
+        per_group_results.append(fold_group_df)
 
         fold_summaries.append({"fold": fold_id,"accuracy": model_metrics["accuracy"],"auroc": model_metrics["auroc"],
                                "demographic_parity_gap": results.demographic_parity_gap,"equalized_odds_gap_tpr": results.equalized_odds_gap_tpr,
@@ -189,6 +194,21 @@ def cross_validate_intersectional_fairness(df: pd.DataFrame,outcome: str,protect
         bootstrap_samples_df = pd.DataFrame()
         overall_bootstrap_summary = pd.DataFrame()
 
+    if return_non_intersectional:
+        for attribute, fairness_result in intermediates["non_intersectional"].items():
+            non_intersectional_metrics.append({
+                "fold": fold_id,
+                "protected_attribute": attribute,
+                "demographic_parity_gap": fairness_result.demographic_parity_gap,
+                "equalized_odds_gap_tpr": fairness_result.equalized_odds_gap_tpr,
+                "equalized_odds_gap_fpr": fairness_result.equalized_odds_gap_fpr,
+                "equal_opportunity_gap": fairness_result.equal_opportunity_gap
+            })
+            group_df = fairness_result.per_group_df.copy()
+            group_df["fold"] = fold_id
+            group_df["protected_attribute"] = attribute
+            non_intersectional_groups.append(group_df)
+
     # Aggregate fold-level robustness summary
     summary_df = (fold_metrics_df.drop(columns=["fold", "n_test"]).agg(["mean", "std", "min", "max"]).T.reset_index().rename(columns={"index": "metric"}))
 
@@ -196,10 +216,13 @@ def cross_validate_intersectional_fairness(df: pd.DataFrame,outcome: str,protect
     summary_df["se"] = summary_df["std"] / np.sqrt(k)
     summary_df["ci95_lower"] = summary_df["mean"] - 1.96 * summary_df["se"]
     summary_df["ci95_upper"] = summary_df["mean"] + 1.96 * summary_df["se"]
+    non_intersectional_metrics_df = pd.DataFrame(non_intersectional_metrics)
+    non_intersectional_groups_df = pd.concat(non_intersectional_groups, ignore_index=True) if non_intersectional_groups else pd.DataFrame()
 
     return {"fold_metrics": fold_metrics_df,"summary": summary_df,"per_group_cv": per_group_cv_df,
             "bootstrap_by_fold": bootstrap_summary_df,"bootstrap_samples": bootstrap_samples_df,
-            "bootstrap_overall": overall_bootstrap_summary}
+            "bootstrap_overall": overall_bootstrap_summary, "non_intersectional_metrics": non_intersectional_metrics_df,
+            "non_intersectional_groups": non_intersectional_groups_df}
 
 
 
