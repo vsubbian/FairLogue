@@ -10,23 +10,20 @@ import seaborn as sns
 
 #---- Plotting helpers -----
 
-def annotate_plot(ax: plt.Axes, u_value: float, x_pos: float = 0.0) -> None:
+def annotate_plot(ax: plt.Axes, u_value: float, threshold: float = 0.1) -> None:
     """
-    Mark a vertical u-value reference on an axis.
+    Mark the u-value threshold on an axis while displaying the calculated u-value.
+    """
+    ax.axvline(threshold, linestyle=":", color="red", linewidth=1.5, label=f"Threshold = {threshold}")
 
-    Draws a dashed vline at `value` and labels it “u-value = …”.
-    See docs/plots.md#annotate_plot
-    """
-    ax.axvline(x_pos, linestyle="--", color="red")
     ymax = ax.get_ylim()[1]
     ax.annotate(
         f"u-value = {u_value:.3f}",
-        xy=(x_pos, ymax * 0.8),
-        xytext=(x_pos, ymax * 0.8),
+        xy=(threshold, ymax * 0.8),
+        xytext=(threshold, ymax * 0.8),
         ha="right",
         va="center",
         bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="black", lw=0.5),
-        arrowprops=dict(arrowstyle="->", lw=0.5),
     )
 
 
@@ -203,13 +200,13 @@ def get_plots(results: Dict[str, object], sampsize: Optional[int] = None, alpha:
                     # Choose data-driven limits, then expand to include 0
                     lo = np.percentile(vals, 1.0)
                     hi = np.percentile(vals, 99.0)
-                    xmin = min(lo, 0.0)
-                    xmax = max(hi, 0.0)
+                    xmin = min(lo, delta_uval)
+                    xmax = max(hi, delta_uval)
                     ax.set_xlim([xmin, xmax])
 
                     # vertical red bar at 0, labeled with the u-value
                     uval = float(table_uval[stat].values[0])
-                    annotate_plot(ax, uval, x_pos=0.0)
+                    annotate_plot(ax, uval, threshold=delta_uval)
 
                 ax.set_title(title, fontsize=14)
                 ax.set_xlabel("Obs. − Null")
