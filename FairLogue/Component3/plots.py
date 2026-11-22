@@ -322,8 +322,8 @@ def get_plots(results: Dict[str, object], sampsize: Optional[int] = None, alpha:
                 yvals = df_sig['value'].to_numpy(dtype=float)
                 plt.scatter(x, yvals)
                 if {'low_trans', 'high_trans'}.issubset(df_sig.columns):
-                    lows = (yvals - df_sig['low_trans'].to_numpy()).clip(min=0)
-                    highs = (df_sig['high_trans'].to_numpy() - yvals).clip(min=0)
+                    lows = abs((yvals - df_sig['low_trans'].to_numpy()).clip(min=0))
+                    highs = abs((df_sig['high_trans'].to_numpy() - yvals).clip(min=0))
                     plt.errorbar(x, yvals, yerr=[lows, highs], fmt='none', capsize=5, elinewidth=2, alpha=0.8)
                 plt.xticks(x, df_sig['stat'].tolist(), rotation=45, ha='right')
                 plt.ylabel(ylabel)
