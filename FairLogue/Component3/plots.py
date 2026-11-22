@@ -160,9 +160,9 @@ def get_plots(results: Dict[str, object], sampsize: Optional[int] = None, alpha:
                                 est_named.get("max_neg", np.nan), delta_uval)],
                 "max_pos": [_uval(null_df.get("max_pos", pd.Series(dtype=float)),
                                 est_named.get("max_pos", np.nan), delta_uval)],
-                "var_neg": [_uval(null_df.get("var_neg", pd.Series(dtype=float)),
+                "var_neg": [_uval(abs(null_df.get("var_neg", pd.Series(dtype=float))),
                                 est_named.get("var_neg", np.nan), delta_uval)],
-                "var_pos": [_uval(null_df.get("var_pos", pd.Series(dtype=float)),
+                "var_pos": [_uval(abs(null_df.get("var_pos", pd.Series(dtype=float))),
                                 est_named.get("var_pos", np.nan), delta_uval)],
             }
         ).round(3)
