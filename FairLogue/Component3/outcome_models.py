@@ -180,7 +180,8 @@ def build_outcome_models_and_scores(
             B = b1 - b0
 
             # Stack X_te B times
-            X_te_stack = np.repeat(X_te, repeats=B, axis=0)  # (B*n_te, P)
+            #X_te_stack = np.repeat(X_te, repeats=B, axis=0)  # (B*n_te, P)
+            X_te_stack = np.tile(X_te, (B, 1))
 
             # Build dummy block (B*n_te, K) but only set one column per row
             # To reduce overhead, we still allocate full K here; if K is huge,
